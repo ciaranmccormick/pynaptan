@@ -3,16 +3,15 @@ import os
 from datetime import datetime
 from io import StringIO
 from logging import getLogger
-from typing import Iterator, Optional, Union
+from typing import Final, Iterator, List, Optional, Union
 
 from httpx import Client, HTTPStatusError
 from pydantic import BaseModel, Field, ValidationError, validator
 
 from pynaptan.exceptions import PyNaptanError
 
-NAPTAN_CSV_URL = os.environ.get(
-    "NAPTAN_CSV_URL", "https://naptan.api.dft.gov.uk/v1/access-nodes"
-)
+_DEFAULT_URL: Final = "https://naptan.api.dft.gov.uk/v1/access-nodes"
+NAPTAN_CSV_URL = os.environ.get("NAPTAN_CSV_URL", _DEFAULT_URL)
 
 logger = getLogger(__name__)
 
@@ -88,9 +87,24 @@ class Naptan(Client):
 
     def __init__(self, url: str = NAPTAN_CSV_URL) -> None:
         """Initialise Naptan class."""
+        super().__init__()
         self.url = url
 
-    def iload_from_string(self, csv_str: str) -> Iterator[Stop]:
+    def get_all_stops(self) -> List[Stop]:
+        """Return a list of all NaPTAN stops."""
+        return list(self.iget_all_stops())
+
+    def iget_all_stops(self) -> Iterator[Stop]:
+        """Load NaPTAN Stops from the NaPTAN API."""
+        api_params = {"dataFormat": "csv"}
+        response = self.get(self.url, params=api_params)
+        try:
+            response.raise_for_status()
+        except HTTPStatusError:
+            raise PyNaptanError("Unable to load stops.")
+        return self._iload_from_string(response.text)
+
+    def _iload_from_string(self, csv_str: str) -> Iterator[Stop]:
         """Load NaPTAN Stops from a string representation of a csv."""
         reader = csv.DictReader(StringIO(csv_str), delimiter=",")
         for idx, entry in enumerate(reader):
@@ -100,13 +114,3 @@ class Naptan(Client):
                 logger.warn("Unable to parse row {0}, skipping.".format(idx))
                 continue
             yield stop
-
-    def iload_from_api(self) -> Iterator[Stop]:
-        """Load NaPTAN Stops from the NaPTAN API."""
-        api_params = {"dataFormat": "csv"}
-        response = self.get(self.url, params=api_params)
-        try:
-            response.raise_for_status()
-        except HTTPStatusError:
-            raise PyNaptanError("Unable to load stops.")
-        return self.iload_from_string(response.text)

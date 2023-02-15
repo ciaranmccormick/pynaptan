@@ -8,7 +8,7 @@ from pynaptan.naptan import Naptan
 
 def test_load_stops(naptan: Naptan, snapshot):
     """Test that stops are loaded."""
-    stops = [stop for stop in naptan.iload_from_api()]
+    stops = [stop for stop in naptan.iget_all_stops()]
     assert len(stops) > 0
     snapshot.assert_match(stops)
 
@@ -20,5 +20,5 @@ def test_iload_stops_exception():
     response = stub(raise_for_status=raiser(error))
     with patch.object(Naptan, "get", return_value=response):
         with pytest.raises(PyNaptanError) as exc:
-            Naptan().iload_from_api()
+            Naptan().iget_all_stops()
         assert str(exc.value) == "Unable to load stops."

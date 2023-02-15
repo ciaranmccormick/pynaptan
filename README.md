@@ -2,12 +2,21 @@
 
 A fully typed python library for retrieving UK NaPTAN stops data.
 
-You can load all the stops from the NaPTAN API using the following code.
+## Getting started
+
+Pynaptan provides a client for querying the NaPTAN data and returning the each
+stop as a `Stop` object.
+
+To retrieve stops from NaPTAN,
 
 ```python
-from pynaptan import iload_from_api, NAPTAN_CSV_URL
+from pynaptan import Naptan
 
-istops = iload_from_api(NAPTAN_CSV_URL)
+client = Naptan()
+
+istops = client.iget_all_stops()
+
+# istops is a generator
 next(istops)
 
 Stop(atco_code='0100BRP90310', naptan_code='bstgwpa', plate_code='',
@@ -26,4 +35,12 @@ modification='new', status='active')
 
 ```
 
-Note that `iload_from_api` function returns `generator`.
+To retrieve all stops as a list of `Stop` objects use the `.get_all_stops` method,
+
+```python
+>> from pynaptan import Naptan
+>> client = Naptan()
+>> stops = client.get_all_stops()
+>> len(stops)
+   436167  
+```
