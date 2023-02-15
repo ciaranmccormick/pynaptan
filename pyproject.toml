@@ -7,15 +7,10 @@ name = "pynaptan"
 description = "Python package for naptan"
 version = "0.2.0"
 license = "MIT"
-
 authors = ["Ciaran McCormick <ciaranmccormick@gmail.com>"]
-
 readme = "README.md"
-
 repository = "https://github.com/ciaranmccormick/pynaptan"
-
-keywords = []
-
+keywords = ["NaPTAN", "bus stops", "stops", "open data"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
@@ -36,6 +31,7 @@ flake8-pytest-style = "^1.6.0"
 ipdb = "^0.13.9"
 ipython = "^8.4.0"
 mypy = "^0.971"
+pip-audit = "^2.4.14"
 pretend = "^1.0.9"
 pytest = "^7.1"
 pytest-cov = "^3.0"
@@ -43,4 +39,3 @@ pytest-randomly = "^3.12"
 pytest-socket = "^0.5.1"
 snapshottest = "^0.6.0"
 wemake-python-styleguide = "^0.17.0"
-pip-audit = "^2.4.14"
