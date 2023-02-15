@@ -3,7 +3,7 @@ default:
 
 # Run linting and mypy checks
 lint:
-	poetry run flake8 pynaptan
+	poetry run flake8 .
 	poetry run mypy pynaptan tests/**/*.py
 
 # Run unit tests

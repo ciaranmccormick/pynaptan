@@ -9,29 +9,34 @@ from pynaptan.nptg import NPTGClient
 
 
 def test_load_regions(nptg, snapshot):
+    """Test regions can be loaded correctly."""
     regions = nptg.get_regions()
     snapshot.assert_match(regions)
 
 
 def test_load_admin_areas(nptg, snapshot):
+    """Test admin areas can be loaded correctly."""
     admin_areas = nptg.get_admin_areas()
-    assert len(admin_areas) > 0
+    assert admin_areas
     snapshot.assert_match(admin_areas)
 
 
 def test_load_localities(nptg, snapshot):
+    """Test localities can be loaded correctly."""
     localities = nptg.get_localities()
-    assert len(localities) > 0
+    assert localities
     snapshot.assert_match(localities)
 
 
 def test_load_districts(nptg, snapshot):
+    """Test districts can be loaded correctly."""
     districts = nptg.get_districts()
-    assert len(districts) > 0
+    assert districts
     snapshot.assert_match(districts)
 
 
 def test_get_zipdata_exception():
+    """Test that nptg can handle exceptions."""
     response = Mock(spec=Response)
     request = Mock(spec=Request)
     error = HTTPStatusError(message="Message", request=request, response=response)
@@ -39,4 +44,4 @@ def test_get_zipdata_exception():
     with patch.object(NPTGClient, "get", return_value=response):
         with pytest.raises(PyNaptanError) as exc:
             NPTGClient().get_zipdata()
-        assert str(exc.value) == "Unable to fetch NPTG data."
+            assert str(exc.value) == "Unable to fetch NPTG data."

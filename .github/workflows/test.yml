@@ -22,6 +22,10 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
+    - name: Set up justfile
+      uses: extractions/setup-just@v1
+      with:
+        just-version: 0.8 # optional semver specification, otherwise latest
 
     - name: Install poetry
       run: |
@@ -38,9 +42,4 @@ jobs:
         poetry install
 
     - name: Run checks
-      run: |
-        poetry run flake8 .
-        poetry run pytest
-        poetry run poetry check
-        poetry run pip check
-        poetry run pip-audit
+      run: just check
