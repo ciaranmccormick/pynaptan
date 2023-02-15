@@ -5,7 +5,7 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry]
 name = "pynaptan"
 description = "Python package for naptan"
-version = "0.1.0"
+version = "0.2.0"
 license = "MIT"
 
 authors = ["Ciaran McCormick <ciaranmccormick@gmail.com>"]

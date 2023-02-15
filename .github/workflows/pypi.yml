@@ -1,0 +1,36 @@
+name: pynaptan-pypi
+
+on:
+  push:
+    tags: "*"
+
+jobs:
+  publish:
+    name: publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup Python 3
+        uses: actions/setup-python@v1
+        with:
+          python-version: "3.9"
+
+      - uses: Gr1N/setup-poetry@v7
+      - name: Set up cache
+        uses: actions/cache@v2
+        with:
+          path: .venv
+          key: venv-${{ matrix.python-version }}-${{ hashFiles('poetry.lock') }}
+      - name: Install dependencies
+        run: |
+          poetry config virtualenvs.in-project true
+          poetry install
+
+      - name: Publish to pypi
+        shell: bash
+        run: |
+          poetry config pypi-token.pypi ${{secrets.PYPI_PASSWORD}}
+          poetry build
+          poetry publish
