@@ -181,3 +181,5 @@ var/
 venv.bak/
 venv/
 wheels/
+_data/
+_script.py
