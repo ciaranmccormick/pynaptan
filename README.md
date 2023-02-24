@@ -1,5 +1,9 @@
 # pynaptan
 
+[![Build Status](https://github.com/ciaranmccormick/pynaptan/workflows/test/badge.svg?branch=main&event=push)](https://github.com/ciaranmccormick/pynaptan/actions?query=workflow%3Atest+)
+[![codecov](https://codecov.io/gh/ciaranmccormick/pynaptan/branch/main/graph/badge.svg)](https://codecov.io/gh/ciaranmccormick/python-naptan)
+[![Python Version](https://img.shields.io/pypi/pyversions/pynaptan.svg)](https://pypi.org/project/pynaptan/)
+
 A fully typed python library for retrieving UK NaPTAN stops data.
 
 ## Getting started
