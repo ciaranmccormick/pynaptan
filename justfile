@@ -10,6 +10,9 @@ lint:
 test:
 	poetry run pytest tests/
 
+snapshot:
+  poetry run pytest tests/ --snapshot-update
+
 # Check packages
 package:
 	poetry check
