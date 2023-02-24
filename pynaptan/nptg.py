@@ -4,24 +4,32 @@ from functools import cached_property
 from logging import getLogger
 from typing import Final, List
 
+from defusedxml.ElementTree import fromstring, tostring
 from httpx import Client, HTTPStatusError
-from lxml import etree
 from pydantic import BaseModel, Field
 
 from pynaptan.exceptions import PyNaptanError
 
 logger = getLogger(__name__)
 
+NSKEY = "ns0"
 _DEFAULT_URL: Final = "https://naptan.api.dft.gov.uk/v1/nptg"
-_NAMESPACE = {None: "http://www.naptan.org.uk/"}
-_ADMIN_AREA: Final = "AdministrativeAreas/AdministrativeArea"
-_DISTRICTS: Final = "NptgDistricts/NptgDistrict"
+_ADMIN_AREA: Final = f"{NSKEY}:AdministrativeAreas/{NSKEY}:AdministrativeArea"
+_DISTRICTS: Final = f"{NSKEY}:NptgDistricts/{NSKEY}:NptgDistrict"
 NPTG_URL = os.environ.get("NPTG_URL", _DEFAULT_URL)
+TRANSLATION = f"{NSKEY}:Translation"
+namespace = {NSKEY: "http://www.naptan.org.uk/"}
 
 
-def clean_tag(tag: str) -> str:
+def _clean_tag(tag: str) -> str:
+    """Remove namespace from tag name."""
     end = tag.find("}") + 1
     return tag[end:]
+
+
+def _to_unicode(xml) -> str:
+    """Return an Element as a unicode string."""
+    return tostring(xml, encoding="unicode")
 
 
 class NPTGBaseModel(BaseModel):
@@ -41,9 +49,10 @@ class District(NPTGBaseModel):
 
     @classmethod
     def from_string(cls, district: str) -> "District":
-        xml = etree.fromstring(district)
+        """Return District from xml string."""
+        xml = fromstring(district)
         district_data = dict(xml.items())
-        district_data.update({clean_tag(x.tag): x.text for x in xml.getchildren()})
+        district_data.update({_clean_tag(child.tag): child.text for child in xml})
         return cls.parse_obj(district_data)
 
 
@@ -60,12 +69,13 @@ class AdministrativeArea(NPTGBaseModel):
 
     @classmethod
     def from_string(cls, admin_area: str) -> "AdministrativeArea":
-        xml = etree.fromstring(admin_area)
+        """Return AdministrativeArea from xml string."""
+        xml = fromstring(admin_area)
         admin_area_data = dict(xml.items())
-        admin_area_data.update({clean_tag(x.tag): x.text for x in xml.getchildren()})
+        admin_area_data.update({_clean_tag(child.tag): child.text for child in xml})
         districts = [
-            District.from_string(etree.tounicode(x))
-            for x in xml.findall(_DISTRICTS, namespaces=_NAMESPACE)
+            District.from_string(_to_unicode(district))
+            for district in xml.findall(_DISTRICTS, namespaces=namespace)
         ]
         admin_area_data["districts"] = districts
         return cls.parse_obj(admin_area_data)
@@ -81,12 +91,13 @@ class Region(NPTGBaseModel):
 
     @classmethod
     def from_string(cls, region: str) -> "Region":
-        xml = etree.fromstring(region)
+        """Return Region from xml string."""
+        xml = fromstring(region)
         region_data = dict(xml.items())
-        region_data.update({clean_tag(x.tag): x.text for x in xml.getchildren()})
+        region_data.update({_clean_tag(child.tag): child.text for child in xml})
         admin_areas = [
-            AdministrativeArea.from_string(etree.tounicode(x))
-            for x in xml.findall(_ADMIN_AREA, namespaces=_NAMESPACE)
+            AdministrativeArea.from_string(_to_unicode(element))
+            for element in xml.findall(_ADMIN_AREA, namespaces=namespace)
         ]
         region_data["administrative_areas"] = admin_areas
         return cls.parse_obj(region_data)
@@ -99,9 +110,10 @@ class Descriptor(BaseModel):
 
     @classmethod
     def from_string(cls, descriptor: str) -> "Descriptor":
-        xml = etree.fromstring(descriptor)
+        """Return Descriptor from xml string."""
+        xml = fromstring(descriptor)
         descriptor_data = {}
-        descriptor_data.update({clean_tag(x.tag): x.text for x in xml.getchildren()})
+        descriptor_data.update({_clean_tag(child.tag): child.text for child in xml})
         return cls.parse_obj(descriptor_data)
 
 
@@ -115,9 +127,10 @@ class Translation(BaseModel):
 
     @classmethod
     def from_string(cls, translation: str) -> "Translation":
-        xml = etree.fromstring(translation)
+        """Return Translation from xml string."""
+        xml = fromstring(translation)
         translation_data = dict(xml.items())
-        translation_data.update({clean_tag(x.tag): x.text for x in xml.getchildren()})
+        translation_data.update({_clean_tag(child.tag): child.text for child in xml})
         return cls.parse_obj(translation_data)
 
 
@@ -128,9 +141,10 @@ class Location(BaseModel):
 
     @classmethod
     def from_string(cls, location: str) -> "Location":
-        xml = etree.fromstring(location)
+        """Return Location from xml string."""
+        xml = fromstring(location)
         location_data = dict(xml.items())
-        translation = etree.tounicode(xml.find("Translation", namespaces=_NAMESPACE))
+        translation = _to_unicode(xml.find(TRANSLATION, namespaces=namespace))
         location_data["Translation"] = Translation.from_string(translation)
         return cls.parse_obj(location_data)
 
@@ -147,14 +161,15 @@ class Locality(NPTGBaseModel):
 
     @classmethod
     def from_string(cls, locality: str) -> "Locality":
-        xml = etree.fromstring(locality)
+        """Return Locality from xml string."""
+        xml = fromstring(locality)
         locality_data = dict(xml.items())
-        locality_data.update({clean_tag(x.tag): x.text for x in xml.getchildren()})
+        locality_data.update({_clean_tag(child.tag): child.text for child in xml})
         locality_data["Location"] = Location.from_string(
-            etree.tounicode(xml.find("Location", namespaces=_NAMESPACE))
+            _to_unicode(xml.find(f"{NSKEY}:Location", namespaces=namespace))
         )
         locality_data["Descriptor"] = Descriptor.from_string(
-            etree.tounicode(xml.find("Descriptor", namespaces=_NAMESPACE))
+            _to_unicode(xml.find(f"{NSKEY}:Descriptor", namespaces=namespace))
         )
         return cls.parse_obj(locality_data)
 
@@ -163,22 +178,26 @@ class NPTGClient(Client):
     """A client for requesting NPTG data."""
 
     def __init__(self, url: str = NPTG_URL):
+        """A HTTP client for retrieving NPTG data."""
         super().__init__()
         self.url = url
 
     @cached_property
     def xml(self):
+        """Return NPTG data as an xml Element."""
         response = self.get(self.url)
         try:
             response.raise_for_status()
         except HTTPStatusError:
             raise PyNaptanError("Unable to fetch NPTG data.")
-        return etree.fromstring(response.text)
+        return fromstring(response.text)
 
     def get_regions(self) -> List[Region]:
-        regions = self.xml.find("Regions", namespaces=_NAMESPACE)
-        return [Region.from_string(etree.tounicode(r)) for r in regions]
+        """Return a list of Regions."""
+        regions = self.xml.find(f"{NSKEY}:Regions", namespaces=namespace)
+        return [Region.from_string(_to_unicode(region)) for region in regions]
 
     def get_localities(self) -> List[Locality]:
-        localities = self.xml.find("NptgLocalities", namespaces=_NAMESPACE)
-        return [Locality.from_string(etree.tounicode(x)) for x in localities]
+        """Return a list of Localities."""
+        localities = self.xml.find(f"{NSKEY}:NptgLocalities", namespaces=namespace)
+        return [Locality.from_string(_to_unicode(locality)) for locality in localities]
