@@ -1,22 +1,27 @@
-import csv
 import os
-import zipfile
 from datetime import datetime
 from functools import cached_property
-from io import BytesIO, StringIO
 from logging import getLogger
-from typing import List
+from typing import Final, List
 
 from httpx import Client, HTTPStatusError
+from lxml import etree
 from pydantic import BaseModel, Field
 
 from pynaptan.exceptions import PyNaptanError
 
 logger = getLogger(__name__)
 
-NPTG_URL = os.environ.get(
-    "NPTG_URL", "https://naptan.app.dft.gov.uk/datarequest/nptg.ashx"
-)
+_DEFAULT_URL: Final = "https://naptan.api.dft.gov.uk/v1/nptg"
+_NAMESPACE = {None: "http://www.naptan.org.uk/"}
+_ADMIN_AREA: Final = "AdministrativeAreas/AdministrativeArea"
+_DISTRICTS: Final = "NptgDistricts/NptgDistrict"
+NPTG_URL = os.environ.get("NPTG_URL", _DEFAULT_URL)
+
+
+def clean_tag(tag: str) -> str:
+    end = tag.find("}") + 1
+    return tag[end:]
 
 
 class NPTGBaseModel(BaseModel):
@@ -28,117 +33,152 @@ class NPTGBaseModel(BaseModel):
     modification: str = Field("", alias="Modification")
 
 
+class District(NPTGBaseModel):
+    """Model for Districts."""
+
+    nptg_district_code: str = Field(..., alias="NptgDistrictCode")
+    name: str = Field(..., alias="Name")
+
+    @classmethod
+    def from_string(cls, district: str) -> "District":
+        xml = etree.fromstring(district)
+        district_data = dict(xml.items())
+        district_data.update({clean_tag(x.tag): x.text for x in xml.getchildren()})
+        return cls.parse_obj(district_data)
+
+
+class AdministrativeArea(NPTGBaseModel):
+    """Model for Admin Areas."""
+
+    administrative_area_code: str = Field(..., alias="AdministrativeAreaCode")
+    atco_area_code: str = Field(..., alias="AtcoAreaCode")
+    area_name_lang: str = Field("", alias="AreaNameLang")
+    name: str = Field(..., alias="Name")
+    short_name: str = Field(..., alias="ShortName")
+    national: int = Field(..., alias="National")
+    districts: List[District]
+
+    @classmethod
+    def from_string(cls, admin_area: str) -> "AdministrativeArea":
+        xml = etree.fromstring(admin_area)
+        admin_area_data = dict(xml.items())
+        admin_area_data.update({clean_tag(x.tag): x.text for x in xml.getchildren()})
+        districts = [
+            District.from_string(etree.tounicode(x))
+            for x in xml.findall(_DISTRICTS, namespaces=_NAMESPACE)
+        ]
+        admin_area_data["districts"] = districts
+        return cls.parse_obj(admin_area_data)
+
+
 class Region(NPTGBaseModel):
     """Model for Region."""
 
     region_code: str = Field(..., alias="RegionCode")
-    region_name: str = Field(..., alias="RegionName")
-    region_name_lang: str = Field(..., alias="RegionNameLang")
-
-
-class AdminArea(NPTGBaseModel):
-    """Model for Admin Areas."""
-
-    administrative_area_code: int = Field(..., alias="AdministrativeAreaCode")
-    atco_area_code: int = Field(..., alias="AtcoAreaCode")
-    area_name: str = Field(..., alias="AreaName")
-    area_name_lang: str = Field("", alias="AreaNameLang")
-    short_name: str = Field(..., alias="ShortName")
-    short_name_lang: str = Field("", alias="ShortNameLang")
+    name: str = Field(..., alias="Name")
     country: str = Field(..., alias="Country")
-    region_code: str = Field(..., alias="RegionCode")
-    maximum_length_for_short_name: str = Field("", alias="MaximumLengthForShortNames")
-    national: int = Field(..., alias="National")
-    contact_email: str = Field("", alias="ContactEmail")
-    contact_telephone: str = Field("", alias="ContactTelephone")
+    administrative_areas: List[AdministrativeArea]
+
+    @classmethod
+    def from_string(cls, region: str) -> "Region":
+        xml = etree.fromstring(region)
+        region_data = dict(xml.items())
+        region_data.update({clean_tag(x.tag): x.text for x in xml.getchildren()})
+        admin_areas = [
+            AdministrativeArea.from_string(etree.tounicode(x))
+            for x in xml.findall(_ADMIN_AREA, namespaces=_NAMESPACE)
+        ]
+        region_data["administrative_areas"] = admin_areas
+        return cls.parse_obj(region_data)
 
 
-class District(NPTGBaseModel):
-    """Model for Districts."""
+class Descriptor(BaseModel):
+    """Models for a Locality Descriptor."""
 
-    district_code: str = Field(..., alias="DistrictCode")
-    district_name: str = Field(..., alias="DistrictName")
-    district_lang: str = Field("", alias="DistrictNameLang")
-    administrative_area_code: int = Field(..., alias="AdministrativeAreaCode")
+    locality_name: str = Field(..., alias="LocalityName")
+
+    @classmethod
+    def from_string(cls, descriptor: str) -> "Descriptor":
+        xml = etree.fromstring(descriptor)
+        descriptor_data = {}
+        descriptor_data.update({clean_tag(x.tag): x.text for x in xml.getchildren()})
+        return cls.parse_obj(descriptor_data)
+
+
+class Translation(BaseModel):
+    """Model for a NPTG Translation."""
+
+    easting: int = Field(..., alias="Easting")
+    northing: int = Field(..., alias="Northing")
+    longitude: float = Field(..., alias="Longitude")
+    latitude: float = Field(..., alias="Latitude")
+
+    @classmethod
+    def from_string(cls, translation: str) -> "Translation":
+        xml = etree.fromstring(translation)
+        translation_data = dict(xml.items())
+        translation_data.update({clean_tag(x.tag): x.text for x in xml.getchildren()})
+        return cls.parse_obj(translation_data)
+
+
+class Location(BaseModel):
+    """Model for NPTG Location."""
+
+    translation: Translation = Field(..., alias="Translation")
+
+    @classmethod
+    def from_string(cls, location: str) -> "Location":
+        xml = etree.fromstring(location)
+        location_data = dict(xml.items())
+        translation = etree.tounicode(xml.find("Translation", namespaces=_NAMESPACE))
+        location_data["Translation"] = Translation.from_string(translation)
+        return cls.parse_obj(location_data)
 
 
 class Locality(NPTGBaseModel):
     """Model for Localities."""
 
     nptg_locality_code: str = Field(..., alias="NptgLocalityCode")
-    locality_name: str = Field(..., alias="LocalityName")
-    locality_name_lang: str = Field(..., alias="LocalityNameLang")
-    short_name: str = Field(..., alias="ShortName")
-    short_name_lang: str = Field("", alias="ShortNameLang")
-    qualifier_name: str = Field("", alias="QualifierName")
-    qualifier_name_lang: str = Field("", alias="QualifierNameLang")
-    qualifier_locality_ref: str = Field("", alias="QualifierLocalityRef")
-    qualifier_district_ref: str = Field("", alias="QualifierDistrictRef")
-    administrative_area_code: int = Field(..., alias="AdministrativeAreaCode")
-    nptg_district_code: int = Field(..., alias="NptgDistrictCode")
+    administrative_area_ref: str = Field(..., alias="AdministrativeAreaRef")
+    nptg_district_ref: int = Field(..., alias="NptgDistrictRef")
     source_locality_type: str = Field(..., alias="SourceLocalityType")
-    grid_type: str = Field(..., alias="GridType")
-    easting: int = Field(..., alias="Easting")
-    northing: int = Field(..., alias="Northing")
+    location: Location = Field(..., alias="Location")
+    descriptor: Descriptor = Field(..., alias="Descriptor")
+
+    @classmethod
+    def from_string(cls, locality: str) -> "Locality":
+        xml = etree.fromstring(locality)
+        locality_data = dict(xml.items())
+        locality_data.update({clean_tag(x.tag): x.text for x in xml.getchildren()})
+        locality_data["Location"] = Location.from_string(
+            etree.tounicode(xml.find("Location", namespaces=_NAMESPACE))
+        )
+        locality_data["Descriptor"] = Descriptor.from_string(
+            etree.tounicode(xml.find("Descriptor", namespaces=_NAMESPACE))
+        )
+        return cls.parse_obj(locality_data)
 
 
 class NPTGClient(Client):
     """A client for requesting NPTG data."""
 
-    def get_zipdata(self, url: str = NPTG_URL) -> bytes:
-        """Get NPTG zipdata from the website."""
-        query_params = {"format": "csv"}
-        logger.debug("Getting the data from NPTG.")
-        response = self.get(url, params=query_params)
+    def __init__(self, url: str = NPTG_URL):
+        super().__init__()
+        self.url = url
+
+    @cached_property
+    def xml(self):
+        response = self.get(self.url)
         try:
             response.raise_for_status()
         except HTTPStatusError:
             raise PyNaptanError("Unable to fetch NPTG data.")
-        return response.content
-
-
-class NPTG:
-    """Class for retrieving NPTG data."""
-
-    def __init__(self, client: NPTGClient):
-        """Client for retrieving NPTGClient data."""
-        self._client = client
-
-    @cached_property
-    def zipdata(self) -> BytesIO:
-        """NPTG zip data."""
-        return BytesIO(self._client.get_zipdata())
+        return etree.fromstring(response.text)
 
     def get_regions(self) -> List[Region]:
-        """Get all the NPTG regions."""
-        filename = "Regions.csv"
-        csvfile = self._extract_file(filename)
-        reader = csv.DictReader(csvfile)
-        return [Region.parse_obj(region) for region in reader]
-
-    def get_admin_areas(self) -> List[AdminArea]:
-        """Get all the NPTG admin areas."""
-        filename = "AdminAreas.csv"
-        csvfile = self._extract_file(filename)
-        reader = csv.DictReader(csvfile)
-        return [AdminArea.parse_obj(area) for area in reader]
-
-    def get_districts(self) -> List[District]:
-        """Get all the NPTG districts."""
-        filename = "Districts.csv"
-        csvfile = self._extract_file(filename)
-        reader = csv.DictReader(csvfile)
-        return [District.parse_obj(district) for district in reader]
+        regions = self.xml.find("Regions", namespaces=_NAMESPACE)
+        return [Region.from_string(etree.tounicode(r)) for r in regions]
 
     def get_localities(self) -> List[Locality]:
-        """Get all the NPTG localities."""
-        filename = "Localities.csv"
-        csvfile = self._extract_file(filename)
-        reader = csv.DictReader(csvfile)
-        return [Locality.parse_obj(locality) for locality in reader]
-
-    def _extract_file(self, filename: str) -> StringIO:
-        """Extract a specific file from the NPTG zipfile."""
-        with zipfile.ZipFile(self.zipdata) as nptg:
-            with nptg.open(filename) as csvfile:
-                return StringIO(csvfile.read().decode("UTF-8"))
+        localities = self.xml.find("NptgLocalities", namespaces=_NAMESPACE)
+        return [Locality.from_string(etree.tounicode(x)) for x in localities]

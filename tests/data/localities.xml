@@ -1,0 +1,40 @@
+<NptgLocalities xmlns="http://www.naptan.org.uk/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <NptgLocality CreationDateTime="2022-08-25T10:28:30.233" ModificationDateTime="2022-08-25T10:28:30.310" RevisionNumber="0" Modification="new">
+      <NptgLocalityCode>N0081215</NptgLocalityCode>
+      <Descriptor>
+          <LocalityName xml:lang="EN">St Michael’s Hurst </LocalityName>
+      </Descriptor>
+      <AdministrativeAreaRef>085</AdministrativeAreaRef>
+      <NptgDistrictRef>68</NptgDistrictRef>
+      <SourceLocalityType>Add</SourceLocalityType>
+      <Location>
+          <Translation>
+              <Easting>549324</Easting>
+              <Northing>223098</Northing>
+              <Longitude>0.1682994</Longitude>
+              <Latitude>51.88645</Latitude>
+          </Translation>
+      </Location>
+  </NptgLocality>
+  <NptgLocality CreationDateTime="2022-11-10T14:45:07" ModificationDateTime="2022-11-11T11:10:07" Modification="new" RevisionNumber="0">
+      <NptgLocalityCode>E0034966</NptgLocalityCode>
+      <Descriptor>
+          <LocalityName xml:lang="EN">Ansty Park</LocalityName>
+          <Qualify>
+              <QualifierName xml:lang="en">Coventry</QualifierName>
+          </Qualify>
+      </Descriptor>
+      <ParentNptgLocalityRef CreationDateTime="2005-10-05T10:46:37" ModificationDateTime="2008-09-30T16:10:07" Modification="revise" RevisionNumber="1">N0073053</ParentNptgLocalityRef>
+      <AdministrativeAreaRef>105</AdministrativeAreaRef>
+      <NptgDistrictRef>246</NptgDistrictRef>
+      <SourceLocalityType>Add</SourceLocalityType>
+      <Location>
+          <Translation>
+              <Easting>440163</Easting>
+              <Northing>281857</Northing>
+              <Longitude>-1.410692</Longitude>
+              <Latitude>52.433219</Latitude>
+          </Translation>
+      </Location>
+  </NptgLocality>
+</NptgLocalities>

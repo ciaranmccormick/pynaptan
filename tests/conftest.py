@@ -5,12 +5,12 @@ import pytest
 from pretend import stub
 
 from pynaptan.naptan import Naptan
-from pynaptan.nptg import NPTG, NPTGClient
+from pynaptan.nptg import NPTGClient
 
 DATA_DIR = Path(__file__).parent / "data"
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def stops_csv():
     """Return contents of the stops.csv."""
     csv_path = DATA_DIR / "stops.csv"
@@ -18,7 +18,7 @@ def stops_csv():
         yield csv_file.read()
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def naptan(stops_csv):
     """Return a patch Naptan object."""
     response = stub(raise_for_status=lambda: True, text=stops_csv)
@@ -26,17 +26,25 @@ def naptan(stops_csv):
         yield Naptan()
 
 
-@pytest.fixture()
-def nptg_zip_bytes() -> bytes:
+@pytest.fixture(scope="session")
+def localities_xml() -> str:
     """Return the nptg zip as bytes."""
-    zip_path = DATA_DIR / "Nptgcsv.zip"
-    with zip_path.open("rb") as zip_file:
-        return zip_file.read()
+    xml_path = DATA_DIR / "localities.xml"
+    with xml_path.open("r") as xml_file:
+        return xml_file.read()
 
 
-@pytest.fixture()
-def nptg(nptg_zip_bytes):
+@pytest.fixture(scope="session")
+def region_string() -> str:
+    """Return the nptg zip as bytes."""
+    xml_path = DATA_DIR / "region.xml"
+    with xml_path.open("r") as xml_file:
+        return xml_file.read()
+
+
+@pytest.fixture(scope="session")
+def nptg(nptg_xml):
     """Return a patched NPTGClient."""
-    response = stub(raise_for_status=lambda: True, content=nptg_zip_bytes)
+    response = stub(raise_for_status=lambda: True, text=nptg_xml)
     with patch.object(NPTGClient, "get", return_value=response):
-        yield NPTG(NPTGClient())
+        yield NPTGClient()
